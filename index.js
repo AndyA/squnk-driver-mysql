@@ -353,7 +353,16 @@ Driver.prototype.loadDelta = function(name) {
     });
 };
 
-Driver.prototype.loadDeltas = function() {};
+Driver.prototype.loadDeltas = function() {
+  return this.getMetaTable()
+    .spread(function(table) {
+      var bind = [table, "sequence"];
+      return this.query(this.format("SELECT * FROM ?? ORDER BY ??", bind))
+        .spread(function(rows) {
+          return rows.map(codec.decode);
+        });
+    });
+};
 
 Driver.prototype.setDeltaState = function(name, state) {
   var delta = this.loadDelta(name);

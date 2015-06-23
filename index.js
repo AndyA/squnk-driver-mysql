@@ -197,7 +197,6 @@ Driver.prototype.getMetaTableName = function() {
 };
 
 Driver.prototype.makeMetaTable = function() {
-  var conn = this.getConnection();
   var table = this.getMetaTableName();
 
   var script = [
@@ -239,11 +238,11 @@ Driver.prototype.getTableColumns = function(table) {
       var cols = [];
       var all = [];
       rows.forEach(function(row) {
-        all.push(row["Field"]);
-        if (row["Key"] === "PRI") {
-          pk.push(row["Field"]);
+        all.push(row.Field);
+        if (row.Key === "PRI") {
+          pk.push(row.Field);
         } else {
-          cols.push(row["Field"]);
+          cols.push(row.Field);
         }
       });
       return {
@@ -303,10 +302,32 @@ function indexedValues(obj, idx) {
     if (extra.length) {
       and.push("has these unknown field(s): " + extra.join(", "));
     }
-    throw new Error("Data" + and.join(" and "))
+    throw new Error("Data" + and.join(" and "));
   }
   return vals;
 }
+
+var codec = (function() {
+  var jsonCols = ["delta", "meta"];
+
+  return {
+    encode: function(delta) {
+      var copy = _.clone(delta);
+      jsonCols.forEach(function(col) {
+        copy[col] = JSON.stringify(copy[col]);
+      });
+      return copy;
+    },
+
+    decode: function(delta) {
+      var copy = _.clone(delta);
+      jsonCols.forEach(function(col) {
+        copy[col] = JSON.parse(copy[col]);
+      });
+      return copy;
+    }
+  };
+})();
 
 // Functions to manipulate deltas
 
@@ -314,7 +335,7 @@ Driver.prototype.saveDelta = function(delta) {
   return this.getMetaTable()
     .spread(function(table, columns) {
       var cols = columns.all;
-      var bind = [table, cols, indexedValues(delta, cols)];
+      var bind = [table, cols, indexedValues(codec.encode(delta), cols)];
       var sql = this.format("REPLACE INTO ?? (" + placeholder("??", cols.length) +
         ") VALUES (" + placeholder("?", cols.length) + ")", bind);
       return this.query(sql);
@@ -322,9 +343,17 @@ Driver.prototype.saveDelta = function(delta) {
 };
 
 Driver.prototype.loadDelta = function(name) {
-
+  return this.getMetaTable()
+    .spread(function(table) {
+      var bind = [table, "name", name];
+      return this.query(this.format("SELECT * FROM ?? WHERE ?? = ?", bind))
+        .spread(function(rows) {
+          return codec.decode(rows[0]);
+        });
+    });
 };
-Driver.prototype.loadDeltas = function(name) {};
+
+Driver.prototype.loadDeltas = function() {};
 
 Driver.prototype.setDeltaState = function(name, state) {
   var delta = this.loadDelta(name);

@@ -4,6 +4,7 @@
       "url" : "https://github.com/AndyA/squnk-driver-mysql/issues"
    },
    "dependencies" : {
+      "mysql" : "^2.7.0",
       "underscore" : "^1.8.3"
    },
    "description" : "Squnk driver for MySQL",

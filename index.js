@@ -2,8 +2,26 @@
 
 var mysql = require("mysql");
 var url = require("url");
+var _ = require("underscore");
+var Promise = require("bluebird");
 
-function Driver() {
+function onError(thing, cb) {
+  return function(err, rows, fields) {
+    if (err) {
+      var msg = thing + " failed: " + err.code + "(" + err.errno + ")";
+      throw new Error(msg);
+    }
+    if (cb) {
+      cb(rows, fields);
+    }
+  };
+}
+
+function Driver(config) {
+  this.config = _.extend({
+    prefix: "_squnk_meta_"
+  }, config);
+
   this.connection = null;
 }
 
@@ -47,7 +65,7 @@ Driver.prototype.parseScript = function(script) {
 
   var matchBlank = /^\s*$/;
   var matchComment = /^\s*--\s*(.*)/;
-  var matchStatement = /^\s*(;|(?:(?:"(?:\\.|.)*")|(?:'(?:\\.|.)*')|[^;])+)/g;
+  var matchStatement = /^\s*(;|(?:(?:"(?:\\.|.)*")|(?:"(?:\\.|.)*")|[^;])+)/g;
 
   var statement = [];
 
@@ -73,7 +91,7 @@ Driver.prototype.parseScript = function(script) {
           if (sm[1] === ";") {
             out.push({
               kind: "statement",
-              text: statement.join(' ')
+              text: statement.join(" ")
             });
             statement = [];
           } else {
@@ -96,22 +114,21 @@ Driver.prototype.parseScript = function(script) {
   return out;
 };
 
-function onError(thing) {
-  return function(err) {
-    if (err) {
-      var msg = thing + " failed: " + err.code + "(" + err.errno + ")";
-      throw new Error(msg);
-    }
-  };
-}
-
 Driver.prototype.connect = function(uri) {
 
   this.disconnect(); // one at a time
 
   var options = this.parseConnectionURI(uri);
   this.connection = mysql.createConnection(options);
-  this.connection.connect(onError("Connect"));
+  var self = this;
+  return new Promise(function(resolve, reject) {
+    self.connection.connect(function(err) {
+      if (err) {
+        reject(err);
+      }
+      resolve(self.connection);
+    });
+  });
 };
 
 Driver.prototype.disconnect = function() {
@@ -119,6 +136,112 @@ Driver.prototype.disconnect = function() {
     this.connection.end();
     this.connection = null;
   }
+};
+
+Driver.prototype.getConnection = function() {
+  if (this.connection === null) {
+    throw new Error("Not connected");
+  }
+  return this.connection;
+};
+
+Driver.prototype.query = function(sql) {
+  var conn = this.getConnection();
+  return new Promise(function(resolve, reject) {
+      conn.query(sql, function(err, rows, fields) {
+        if (err) {
+          reject(err);
+        }
+        console.log("result: " + JSON.stringify({
+          rows: rows,
+          fields: fields
+        }, null, 2));
+        resolve([rows, fields]);
+      });
+    })
+    .bind(this);
+};
+
+Driver.prototype.runScript = function(script) {
+  var conn = this.getConnection();
+  var p = Promise.bind(this);
+
+  this.parseScript(script)
+    .forEach(function(itm) {
+      switch (itm.kind) {
+        case "comment":
+          if (itm.text.charAt(0) === "*") {
+            p = p.then(function() {
+              console.log(itm.text);
+            });
+          }
+          break;
+        case "statement":
+          p = p.then(function() {
+            return this.query(itm.text);
+          });
+          break;
+        default:
+          throw new Error("Unpexeced " + itm.kind + " in script");
+      }
+    }, this);
+
+  return p;
+};
+
+// Create our tables (private)
+
+Driver.prototype.makeMetaTable = function(table) {
+  var conn = this.getConnection();
+  var create = conn.format("CREATE TABLE ?? (" +
+    "  name VARCHAR(80) NOT NULL" + ")", [table])
+  return this.query(create)
+    .spread(function(rows, fields) {
+      console.log("result: " + JSON.stringify({
+        rows: rows,
+        fields: fields
+      }, null, 2));
+      return table;
+    });
+};
+
+Driver.prototype.getMetaTable = function() {
+  var conn = this.getConnection();
+  var table = this.config.prefix + "deltas";
+
+  return this.query(conn.format("SHOW TABLES LIKE ?", [table]))
+    .spread(function(rows, fields) {
+      console.log("result: " + JSON.stringify({
+        rows: rows,
+        fields: fields
+      }, null, 2));
+      if (rows.length === 0) {
+        return this.makeMetaTable(table);
+      }
+      return table;
+    });
+};
+
+// Functions to manipulate deltas
+
+Driver.prototype.saveDelta = function(name, delta) {};
+Driver.prototype.loadDelta = function(name) {};
+Driver.prototype.loadDeltas = function(name) {};
+
+Driver.prototype.setDeltaState = function(name, state) {
+  var delta = this.loadDelta(name);
+  if (delta === null) {
+    throw new Error("Unknown delta: " + name);
+  }
+  if (delta.state !== state) {
+    delta.state = state;
+    this.saveDelta(name, delta);
+  }
+};
+
+Driver.prototype.getDeltaState = function(name) {
+  return this.loadDelta(name)
+    .state;
 };
 
 module.exports = Driver;

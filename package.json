@@ -1,0 +1,48 @@
+{
+   "author" : "Andy Armstrong <andy@hexten.net>",
+   "bugs" : {
+      "url" : "https://github.com/AndyA/squnk-driver-mysql/issues"
+   },
+   "dependencies" : {
+      "underscore" : "^1.8.3"
+   },
+   "description" : "Squnk driver for MySQL",
+   "devDependencies" : {
+      "chai" : "^3.0.0",
+      "chai-subset" : "^1.0.1",
+      "eslint" : "^0.23.0",
+      "eslint-plugin-mocha" : "^0.2.2",
+      "gulp" : "^3.9.0",
+      "gulp-eslint" : "^0.14.0",
+      "gulp-mocha" : "^2.1.2"
+   },
+   "eslintConfig" : {
+      "env" : {
+         "node" : true
+      },
+      "plugins" : [
+         "mocha"
+      ],
+      "rules" : {
+         "mocha/no-exclusive-tests" : 2,
+         "no-loop-func" : 0
+      }
+   },
+   "homepage" : "https://github.com/AndyA/squnk-driver-mysql#readme",
+   "keywords" : [
+      "database",
+      "migration",
+      "schema"
+   ],
+   "license" : "ISC",
+   "main" : "index.js",
+   "name" : "squnk-driver-mysql",
+   "repository" : {
+      "type" : "git",
+      "url" : "git+https://github.com/AndyA/squnk-driver-mysql.git"
+   },
+   "scripts" : {
+      "test" : "gulp test"
+   },
+   "version" : "0.0.1"
+}

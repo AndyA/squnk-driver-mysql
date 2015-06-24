@@ -14,7 +14,7 @@ if (process.env.SQUNK_DB) {
   describe("squnk-driver-mysql", function() {
 
     var driver = new Driver({
-      logger: console
+      logger: null
     });
 
     before("connect driver", function() {
@@ -63,7 +63,7 @@ if (process.env.SQUNK_DB) {
       .forEach(function(sequence) {
         it("should save delta " + sequence, function() {
           return expect(driver.saveDelta(makeDelta(sequence)))
-            .to.be.fullfilled;
+            .to.eventually.be.not.null;
         });
       });
 
@@ -88,7 +88,7 @@ if (process.env.SQUNK_DB) {
 
     it("should re-set an existing state", function() {
       return expect(driver.setDeltaState(2, "deployed"))
-        .to.be.fullfilled;
+        .to.eventually.be.not.null;
     });
 
     it("should not have changed the state", function() {
@@ -98,7 +98,7 @@ if (process.env.SQUNK_DB) {
 
     it("should set a different state", function() {
       return expect(driver.setDeltaState(3, "deployed"))
-        .to.be.fullfilled;
+        .to.eventually.be.not.null;
     });
 
     it("should have changed the state", function() {

@@ -4,7 +4,7 @@ var chai = require("chai");
 chai.use(require("chai-subset"));
 var expect = chai.expect;
 
-var Driver = require("../");
+var Driver = require("../lib/driver/");
 
 describe("squnk-driver-mysql", function() {
 

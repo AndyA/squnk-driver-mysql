@@ -6,7 +6,7 @@ chai.use(require("chai-as-promised"));
 var expect = chai.expect;
 var _ = require("underscore");
 
-var Driver = require("../");
+var Driver = require("../lib/driver/");
 
 // Set SQUNK_DB to a db URI to run these tests
 

@@ -7,6 +7,7 @@ var Promise = require("bluebird");
 
 function Driver(config) {
   this.config = _.extend({
+    logger: console,
     prefix: "_squnk_meta_"
   }, config);
 
@@ -14,6 +15,13 @@ function Driver(config) {
   this.tableInfoCache = {};
   this.metaTable = null;
 }
+
+Driver.prototype.log = function() {
+  var logger = this.config.logger;
+  if (logger !== null) {
+    logger.log.apply(logger, _.toArray(arguments));
+  }
+};
 
 Driver.prototype.parseConnectionURI = function(uri) {
 
@@ -106,7 +114,9 @@ Driver.prototype.parseScript = function(script) {
 
 Driver.prototype.connect = function(uri) {
 
-  this.disconnect(); // one at a time
+  if (this.connection !== null) {
+    throw new Error("Already connected");
+  }
 
   var options = this.parseConnectionURI(uri);
   this.connection = mysql.createConnection(options);
@@ -137,13 +147,14 @@ Driver.prototype.getConnection = function() {
 
 Driver.prototype.query = function(sql) {
   var conn = this.getConnection();
+  var self = this;
   return new Promise(function(resolve, reject) {
       conn.query(sql, function(err, rows, fields) {
         if (err) {
           reject(err);
         }
-        console.log("query: " + sql);
-        //        console.log("result: " + JSON.stringify({
+        self.log("query: " + sql);
+        //        this.log("result: " + JSON.stringify({
         //          rows: rows,
         //          fields: fields
         //        }, null, 2));
@@ -162,7 +173,7 @@ Driver.prototype.runScript = function(script) {
         case "comment":
           if (itm.text.charAt(0) === "*") {
             p = p.then(function() {
-              console.log(itm.text);
+              this.log(itm.text);
             });
           }
           break;
@@ -194,6 +205,20 @@ Driver.prototype.format = function() {
 
 Driver.prototype.getMetaTableName = function() {
   return this.config.prefix + "deltas";
+};
+
+Driver.prototype.dropMetaTable = function() {
+  var table = this.getMetaTableName();
+
+  var script = [
+      "-- * Dropping ??",
+      "DROP TABLE IF EXISTS ??;"
+    ].map(function(ln) {
+      return this.format(ln, [table]);
+    }, this)
+    .join("\n");
+
+  return this.runScript(script);
 };
 
 Driver.prototype.makeMetaTable = function() {
@@ -342,12 +367,15 @@ Driver.prototype.saveDelta = function(delta) {
     });
 };
 
-Driver.prototype.loadDelta = function(name) {
+Driver.prototype.loadDelta = function(sequence) {
   return this.getMetaTable()
     .spread(function(table) {
-      var bind = [table, "name", name];
+      var bind = [table, "sequence", sequence];
       return this.query(this.format("SELECT * FROM ?? WHERE ?? = ?", bind))
         .spread(function(rows) {
+          if (rows.length === 0) {
+            return null;
+          }
           return codec.decode(rows[0]);
         });
     });
@@ -364,20 +392,17 @@ Driver.prototype.loadDeltas = function() {
     });
 };
 
-Driver.prototype.setDeltaState = function(name, state) {
-  var delta = this.loadDelta(name);
-  if (delta === null) {
-    throw new Error("Unknown delta: " + name);
-  }
-  if (delta.state !== state) {
-    delta.state = state;
-    this.saveDelta(name, delta);
-  }
-};
-
-Driver.prototype.getDeltaState = function(name) {
-  return this.loadDelta(name)
-    .state;
+Driver.prototype.setDeltaState = function(sequence, state) {
+  return this.loadDelta(sequence)
+    .then(function(delta) {
+      if (delta === null) {
+        throw new Error("Unknown delta: " + sequence);
+      }
+      if (delta.state !== state) {
+        delta.state = state;
+        return this.saveDelta(delta);
+      }
+    });
 };
 
 module.exports = Driver;

@@ -11,6 +11,7 @@
    "description" : "Squnk driver for MySQL",
    "devDependencies" : {
       "chai" : "^3.0.0",
+      "chai-as-promised" : "^5.1.0",
       "chai-subset" : "^1.0.1",
       "eslint" : "^0.23.0",
       "eslint-plugin-mocha" : "^0.2.2",

@@ -147,17 +147,11 @@ Driver.prototype.getConnection = function() {
 
 Driver.prototype.query = function(sql) {
   var conn = this.getConnection();
-  var self = this;
   return new Promise(function(resolve, reject) {
       conn.query(sql, function(err, rows, fields) {
         if (err) {
           reject(err);
         }
-        self.log("query: " + sql);
-        //        this.log("result: " + JSON.stringify({
-        //          rows: rows,
-        //          fields: fields
-        //        }, null, 2));
         resolve([rows, fields]);
       });
     })

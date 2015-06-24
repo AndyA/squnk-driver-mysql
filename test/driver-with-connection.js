@@ -42,16 +42,28 @@ if (process.env.SQUNK_DB) {
         }]);
     });
 
-    function makeDeltaWithState(sequence, state) {
+    function makeStateWithState(sequence, state) {
       return {
         name: "test-" + sequence,
         sequence: sequence,
-        state: state,
+        state: state
+      };
+    }
+
+    function makeDeltaWithState(sequence, state) {
+      var delta = makeStateWithState(sequence, state);
+      _.extend(delta, {
         delta: {},
         meta: {
           description: "Test delta " + sequence
         }
-      };
+      });
+      return delta;
+    }
+
+    function makeState(sequence) {
+      return makeStateWithState(sequence,
+        sequence < 3 ? "deployed" : "pending");
     }
 
     function makeDelta(sequence) {
@@ -79,6 +91,12 @@ if (process.env.SQUNK_DB) {
       return expect(driver.loadDeltas())
         .to.eventually.deep.equal(_.range(5)
           .map(makeDelta));
+    });
+
+    it("should load all the delta states", function() {
+      return expect(driver.loadDeltaStates())
+        .to.eventually.deep.equal(_.range(5)
+          .map(makeState));
     });
 
     it("should return null for a missing delta", function() {
